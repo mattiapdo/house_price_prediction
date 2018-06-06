@@ -268,7 +268,7 @@ test$Age = test$YrSold - test$YearBuilt
 train$YearBuilt = test$YearBuilt = NULL # to avoid collinearity between Age and YearBuilt
 ```
 
-2) new variable: 'IsRemod' - factor variable... it indicates if the house has been remodelled in the last 5 years
+2) new variable: 'JustRemod' - factor variable... it indicates if the house has been remodelled in the last 5 years
 
 ```{r}
 train$JustRemod = as.factor(ifelse(train$YrSold - train$YearRemodAdd <= 5, 1, 0))
@@ -301,3 +301,12 @@ test$FullBath = test$HalfBath = NULL
 
 
 ### Multivariate Analysis
+
+```{r}
+library(caret)
+```
+
+```{r}
+
+```
+
