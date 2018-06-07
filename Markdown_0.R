@@ -34,9 +34,11 @@ na.summary= function(train, test){
   var.types <- list.df.var.types(all.data)
   
   integer.names = var.types$integer
+  print(integer.names)
   integers = all.data[,integer.names]
   
   factor.names = var.types$character
+  print(factor.names)
   factors = all.data[,factor.names]
   
   nas = list(rep(NA, 2))
@@ -201,23 +203,32 @@ test[c("BsmtFullBath","BsmtHalfBath","BsmtFinSF1","BsmtFinSF2","BsmtUnfSF","Tota
 na.summary(train, test)
 ```
 
+
+```{r}
+# to be better handled
+
+train$GarageYrBlt = test$GarageYrBlt = NULL
+
+na.summary(train, test)
+```
+
 *GarageYrBlt still has NA's..decide whether whether dropping the GarageYrBlt column*
 
 ## Outliers
 
 ```{r}
-var.types <- list.df.var.types(train)
-var.types
-integer.names = var.types$integer
-integers = train[,integer.names]
-
-plot(train$LotFrontage, train$SalePrice, xlab = "LotFrontage", ylab = 'Sale Price')
-plot(train$MasVnrArea, train$SalePrice, xlab = "MasVnrArea", ylab = 'Sale Price')
-
-# to be commented
-for (i in 1:(ncol(integers))){
-  plot(integers[,i], integers$SalePrice, xlab = paste(colnames(integers)[i]), ylab = 'Sale Price')
-}
+# var.types <- list.df.var.types(train)
+# var.types
+# integer.names = var.types$integer
+# integers = train[,integer.names]
+# 
+# plot(train$LotFrontage, train$SalePrice, xlab = "LotFrontage", ylab = 'Sale Price')
+# plot(train$MasVnrArea, train$SalePrice, xlab = "MasVnrArea", ylab = 'Sale Price')
+# 
+# # to be commented
+# for (i in 1:(ncol(integers))){
+#   plot(integers[,i], integers$SalePrice, xlab = paste(colnames(integers)[i]), ylab = 'Sale Price')
+# }
 ```
 
 ```{r}
@@ -234,7 +245,8 @@ train  = train[!train$GrLivArea > 4500,]
 1) MSSubClass: identifies the type of dwelling involved in the sale
 
 ```{r}
-train$MSSubClass <- as.factor(train$MSSubClass)
+train$MSSubClass <- factor(train$MSSubClass)
+test$MSSubClass <- factor(test$MSSubClass)
 ```
 
 2) YrSold, MoSold must be treated like factors, because 
@@ -271,8 +283,8 @@ train$YearBuilt = test$YearBuilt = NULL # to avoid collinearity between Age and 
 2) new variable: 'JustRemod' - factor variable... it indicates if the house has been remodelled in the last 5 years
 
 ```{r}
-train$JustRemod = as.factor(ifelse(train$YrSold - train$YearRemodAdd <= 5, 1, 0))
-test$JustRemod = as.factor(ifelse(test$YrSold - test$YearRemodAdd <= 5, 1, 0))
+train$JustRemod = factor(ifelse(train$YrSold - train$YearRemodAdd <= 5, 1, 0))
+test$JustRemod = factor(ifelse(test$YrSold - test$YearRemodAdd <= 5, 1, 0))
 
 train$YearRemodAdd = test$YearRemdAdd = NULL # to avoid collinearity between JustRemod and YearRemod
 ```
@@ -285,8 +297,8 @@ train$YrSold = train$YearBuilt = train$YearRemodAdd = NULL
 test$YrSold = test$YearBuilt = test$YearRemodAdd = NULL
 
 # Month Sold as Factor
-train$MoSold <- as.factor(train$MoSold)
-test$MoSold <- as.factor(test$MoSold)
+train$MoSold <- factor(train$MoSold)
+test$MoSold <- factor(test$MoSold)
 ```
 
 3) new variable: 'TotBath' = 'FullBath' + 3/5 * 'HalfBath'
@@ -306,7 +318,47 @@ test$FullBath = test$HalfBath = NULL
 library(caret)
 ```
 
-```{r}
 
+```{r}
+na.summary(train = train, test = test)
+```
+
+```{r}
+train$SalePrice = log(train$SalePrice)
+barplot(table(test$MSSubClass), main = "MSSubClass")
+levels(train$MSSubClass) <- union(levels(test$MSSubClass), levels(train$MSSubClass))
+```
+
+
+```{r}
+# 5-Fold Cross Validation to find the optimal lambda parameter to be used in Lasso Shrinkage
+control <-trainControl(method="cv", number=5)
+#grid <- expand.grid(alpha = c(0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6), lambda = seq(0.0001,0.0015,by = 0.0001))
+
+lasso_mod <- train(SalePrice ~.-Id, 
+                   data = train, 
+                   method='glmnet', 
+                   trControl= control, 
+                   #preProcess = c("center", "scale", "pca"),
+                   tuneLength = 10,
+                   metric = "Rsquared") 
+lasso_mod
+plot(lasso_mod)
+```
+
+```{r}
+# lassoVarImp <- varImp(lasso_mod,scale=F)
+# lassoImportance <- lassoVarImp$importance
+# 
+# varsSelected <- length(which(lassoImportance$Overall!=0))
+# varsNotSelected <- length(which(lassoImportance$Overall==0))
+# 
+# cat('Lasso uses', varsSelected, 'variables in its model, and did not select', varsNotSelected, 'variables.')
+```
+
+
+```{r}
+pred <- predict(lasso_mod, test)
+write.csv(data.frame(Id=test$Id,SalePrice=exp(pred)),"lasso_pred.csv",row.names=FALSE)
 ```
 
